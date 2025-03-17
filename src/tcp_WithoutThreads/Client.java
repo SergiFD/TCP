@@ -8,26 +8,41 @@ import java.net.Socket;
 public class Client {
 
 	public static void main(String[] args) {
-		try (Socket client = new Socket("127.0.0.1", 9999);
-				PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-				BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-				BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in))) {
+		try (Socket socket = new Socket("127.0.0.1", 9000);
+				BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+				BufferedReader console = new BufferedReader(new InputStreamReader(System.in))) {
 
-			System.out.println("Conectado al servidor.");
-			System.out.println(in.readLine()); // Mensaje de bienvenida
+			System.out.println("Conectado al servidor en 127.0.0.1:9000");
+			System.out.println("Escribe un mensaje para enviarlo. Escribe '!EXIT' para salir.");
 
-			// Usamos InputHandler para leer la entrada del usuario sin hilos
-			InputHandler inputHandler = new InputHandler(out, userInput);
-			inputHandler.handleInput(); // Procesar la entrada del usuario
+			// Se crean los manejadores de conexión y entrada
+			ConnectionHandler connectionHandler = new ConnectionHandler(in);
+			InputHandler inputHandler = new InputHandler(out, console);
 
-			// Mostrar mensajes del servidor
-			String serverMessage;
-			while ((serverMessage = in.readLine()) != null) {
-				System.out.println("Servidor dice: " + serverMessage);
+			// Bucle principal del cliente
+			while (true) {
+				// 1️⃣ Leer entrada del usuario desde la consola
+				String clientMessage = inputHandler.readInput();
+				if (clientMessage.equalsIgnoreCase("!EXIT")) {
+					out.println("!EXIT");
+					break; // Si el cliente decide salir, cerramos la conexión
+				}
+				out.println(clientMessage);
+
+				// 2️⃣ Leer respuesta del servidor
+				String serverMessage = connectionHandler.readMessage();
+				if (serverMessage == null || serverMessage.equalsIgnoreCase("/quit")) {
+					System.out.println("El servidor se ha desconectado.");
+					break; // Salimos si el servidor cierra la conexión
+				}
+				System.out.println("Servidor: " + serverMessage);
 			}
 
 		} catch (Exception e) {
 			System.out.println("Error en el cliente: " + e.getMessage());
 		}
+
+		System.out.println("Cliente cerrado.");
 	}
 }

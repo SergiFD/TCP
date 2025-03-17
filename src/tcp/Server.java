@@ -3,66 +3,59 @@ package tcp;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Server implements Runnable {
 
-	private ArrayList<ConnectionHandler> connections;
 	private ServerSocket server;
-	private boolean done;
+	private boolean running;
 	private ExecutorService pool;
+	private ConnectionHandler connection;
 
-	public Server() {
-		connections = new ArrayList<>();
-		done = false;
+	public Server(int port) {
+		try {
+			server = new ServerSocket(port);
+			running = true;
+			pool = Executors.newCachedThreadPool();
+		} catch (IOException e) {
+			System.out.println("Error iniciando el servidor: " + e.getMessage());
+			running = false;
+		}
 	}
 
 	@Override
 	public void run() {
-		try {
-			server = new ServerSocket(9999);
-			pool = Executors.newCachedThreadPool();
-			while (!done) {
+		System.out.println("Servidor esperando conexiones en el puerto " + server.getLocalPort());
+
+		while (running) {
+			try {
 				Socket client = server.accept();
-				ConnectionHandler handler = new ConnectionHandler(client, this);
-				connections.add(handler);
-				pool.execute(handler);
-			}
-		} catch (IOException e) {
-			shutdown();
-		}
-	}
+				System.out.println("Cliente conectado: " + client.getInetAddress());
 
-	public void broadcast(String message) {
-		for (ConnectionHandler ch : connections) {
-			if (ch != null) {
-				ch.sendMessage(message);
+				// Crear y manejar una conexión (uno a uno)
+				connection = new ConnectionHandler(client, this);
+				pool.execute(connection);
+
+			} catch (IOException e) {
+				System.out.println("Error en la conexión: " + e.getMessage());
 			}
 		}
 	}
 
-	public void removeConnection(ConnectionHandler handler) {
-		connections.remove(handler);
-	}
-
-	public void shutdown() {
-		done = true;
+	public void stopServer() {
+		running = false;
 		try {
-			if (!server.isClosed()) {
+			if (server != null)
 				server.close();
-			}
+			pool.shutdown();
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
-		for (ConnectionHandler ch : connections) {
-			ch.shutdown();
 		}
 	}
 
 	public static void main(String[] args) {
-		Server server = new Server();
-		server.run();
+		Server server = new Server(9000);
+		new Thread(server).start();
 	}
 }

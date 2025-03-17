@@ -2,68 +2,63 @@ package tcp;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
 
 public class Client implements Runnable {
 
-	private Socket client;
-	private BufferedReader in;
-	private PrintWriter out;
-	private boolean done;
+	private String serverIP;
+	private int serverPort;
+	private boolean running;
+
+	public Client(String serverIP, int serverPort) {
+		this.serverIP = serverIP;
+		this.serverPort = serverPort;
+		running = true;
+	}
 
 	@Override
 	public void run() {
-		try {
-			client = new Socket("127.0.0.1", 9999);
-			out = new PrintWriter(client.getOutputStream(), true);
-			in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+		try (Socket socket = new Socket(serverIP, serverPort);
+				PrintWriter out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
+				BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				BufferedReader console = new BufferedReader(new InputStreamReader(System.in))) {
 
-			InputHandler inHandler = new InputHandler(this);
-			Thread t = new Thread(inHandler);
-			t.start();
+			System.out.println("Conectado a " + serverIP + ":" + serverPort);
+			System.out.println("Escribe mensajes para enviarlos. Escribe '!EXIT' para salir.");
 
-			String inMessage;
-			while ((inMessage = in.readLine()) != null) {
-				System.out.println(inMessage);
+			// Hilo para recibir mensajes del servidor
+			Thread listenerThread = new Thread(() -> {
+				try {
+					String incomingMessage;
+					while ((incomingMessage = in.readLine()) != null) {
+						System.out.println("Servidor: " + incomingMessage);
+					}
+				} catch (Exception e) {
+					System.out.println("Error al recibir mensajes del servidor.");
+				}
+			});
+			listenerThread.start();
+
+			// Bucle para enviar mensajes al servidor
+			while (running) {
+				String message = console.readLine();
+				if (message.equalsIgnoreCase("!EXIT")) {
+					running = false;
+					out.println("!EXIT"); // Enviar comando de salida al servidor
+					break;
+				}
+				out.println(message);
 			}
+
 		} catch (Exception e) {
-			System.out.println("Error en el cliente: " + e.getMessage());
-			e.printStackTrace();
-		} finally {
-			shutdown(); // Asegurar que shutdown se llama siempre, pero con las verificaciones previas
+			System.out.println("Error en la conexión: " + e.getMessage());
 		}
-	}
-
-	public void shutdown() {
-		done = true;
-		try {
-			if (in != null) { // Verificar que in no sea null antes de cerrarlo
-				in.close();
-			}
-			if (out != null) { // Verificar que out no sea null antes de cerrarlo
-				out.close();
-			}
-			if (client != null && !client.isClosed()) { // Verificar que client no sea null
-				client.close();
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	public boolean isDone() {
-		return done;
 	}
 
 	public static void main(String[] args) {
-		Client client = new Client();
-		client.run();
-	}
-
-	public void sendMessage(String message) {
-		if (out != null) { // Verifica que out no sea null antes de usarlo
-			out.println(message);
-		}
+		Client client = new Client("127.0.0.1", 9000);
+		new Thread(client).start();
 	}
 }

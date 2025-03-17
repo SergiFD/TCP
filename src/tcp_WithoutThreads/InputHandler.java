@@ -6,27 +6,21 @@ import java.io.PrintWriter;
 
 public class InputHandler {
 
-	private PrintWriter out;
-	private BufferedReader userInput;
+	private PrintWriter out; // Salida para enviar mensajes al cliente
+	private BufferedReader console; // Lector de la entrada del servidor (teclado)
 
-	public InputHandler(PrintWriter out, BufferedReader userInput) {
+	public InputHandler(PrintWriter out, BufferedReader console) {
 		this.out = out;
-		this.userInput = userInput;
+		this.console = console;
 	}
 
-	public void handleInput() {
+	public String readInput() {
 		try {
-			String message;
-			while ((message = userInput.readLine()) != null) {
-				out.println(message); // Enviar mensaje al servidor
-
-				if (message.equalsIgnoreCase("!EXIT")) {
-					System.out.println("Saliendo del chat...");
-					break; // Salir del bucle
-				}
-			}
+			System.out.print("Tú: ");
+			return console.readLine();
 		} catch (IOException e) {
-			System.out.println("Error al leer la entrada del usuario: " + e.getMessage());
+			System.out.println("Error al leer entrada: " + e.getMessage());
+			return "!EXIT"; // En caso de error, devolver "!EXIT" para cerrar conexión
 		}
 	}
 }
